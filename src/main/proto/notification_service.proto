@@ -21,6 +21,13 @@ message SendTemplatedNotificationRequest {
   string recipient_name = 6;
   string template_code = 7;
   string payload_json = 8;
+  string source_event_uuid = 9;
+  string priority = 10;
+  string actor_uuid = 11;
+  string actor_type = 12;
+  string subject = 13;
+  string body = 14;
+  string evidence_document_uuid = 15;
 }
 
 message RegisterNotificationEventRequest {
@@ -31,6 +38,9 @@ message RegisterNotificationEventRequest {
   string recipient = 5;
   string subject = 6;
   string body = 7;
+  string recipient_name = 8;
+  string priority = 9;
+  string evidence_document_uuid = 10;
 }
 
 message GetNotificationStatusRequest {

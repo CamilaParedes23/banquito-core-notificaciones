@@ -19,10 +19,15 @@ spring:
             enable: ${SMTP_STARTTLS_ENABLE:false}
 
 banquito:
+  internal:
+    service-key: ${INTERNAL_SERVICE_KEY:BanQuitoInternalServiceKey2026ChangeMe}
   security:
     jwt:
       issuer: ${JWT_ISSUER:banquito-identity-access}
       secret: ${JWT_SECRET:BanQuitoIdentityJwtSecretKeyForDevelopmentOnlyChangeMe2026}
+  grpc:
+    server:
+      port: ${NOTIFICATION_GRPC_PORT:9097}
   notification:
     delivery:
       mode: ${NOTIFICATION_DELIVERY_MODE:SIMULATED}

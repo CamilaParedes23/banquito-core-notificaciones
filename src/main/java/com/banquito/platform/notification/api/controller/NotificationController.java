@@ -4,12 +4,14 @@ import com.banquito.platform.notification.api.dto.api.*;
 import com.banquito.platform.notification.application.service.NotificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN_SEGURIDAD') or hasAuthority('SCOPE_notification.send')")
 public class NotificationController {
     private final NotificationService notificationService;
 

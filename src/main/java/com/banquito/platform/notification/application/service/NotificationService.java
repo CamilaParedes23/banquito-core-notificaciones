@@ -1,6 +1,7 @@
 package com.banquito.platform.notification.application.service;
 
 import com.banquito.platform.notification.api.dto.api.*;
+import com.banquito.platform.notification.api.dto.internal.InternalNotificationRequest;
 import com.banquito.platform.notification.domain.enums.*;
 import com.banquito.platform.notification.domain.model.*;
 import com.banquito.platform.notification.domain.repository.*;
@@ -24,6 +25,7 @@ public class NotificationService {
     private final NotificationRequestRepository requestRepository;
     private final NotificationDeliveryAttemptRepository attemptRepository;
     private final NotificationChannelConfigRepository channelRepository;
+    private final NotificationPreferenceRepository preferenceRepository;
     private final AuditoriaNotificationEventoRepository auditRepository;
     private final SmtpNotificationSender smtpNotificationSender;
 
@@ -75,6 +77,92 @@ public class NotificationService {
         NotificationRequest saved = requestRepository.save(request);
         procesarEnvio(saved);
         registrarAuditoria(saved.getUuidCorrelacion(), "REQUEST_NOTIFICATION", "NOTIFICATION_REQUEST", saved.getUuidNotificacion(), ResultadoAuditoriaNotificationEnum.OK, null);
+        return toNotificationResponse(saved);
+    }
+
+    @Transactional
+    public NotificationResponse solicitarNotificacionInterna(InternalNotificationRequest dto) {
+        TipoCanalEnum canal = parseEnum(
+                TipoCanalEnum.class,
+                dto.channelType(),
+                "NOTIFICATION_CHANNEL_INVALID",
+                "Tipo de canal inválido"
+        );
+        PrioridadNotificacionEnum prioridad =
+                dto.priority() == null || dto.priority().isBlank()
+                        ? PrioridadNotificacionEnum.NORMAL
+                        : parseEnum(
+                                PrioridadNotificacionEnum.class,
+                                dto.priority(),
+                                "NOTIFICATION_PRIORITY_INVALID",
+                                "Prioridad inválida"
+                        );
+        validarCanalActivo(canal);
+
+        String recipient = resolverDestino(
+                dto.actorUuid(),
+                dto.eventType(),
+                canal,
+                dto.recipient()
+        );
+
+        var existing = requestRepository
+                .findFirstByUuidEventoOrigenAndTipoEventoAndDestinatario(
+                        dto.sourceEventUuid(),
+                        dto.eventType(),
+                        recipient
+                );
+        if (existing.isPresent()) {
+            NotificationRequest request = existing.get();
+            if (request.getEstado() != EstadoNotificacionEnum.ENVIADA) {
+                procesarEnvio(request);
+            }
+            return toNotificationResponse(request);
+        }
+
+        NotificationTemplate template = resolverTemplate(dto.templateCode(), dto.eventType(), canal);
+        String subject = dto.subject() != null
+                ? dto.subject()
+                : render(template == null ? null : template.getAsuntoTemplate(), dto.payload());
+        String body = dto.body() != null
+                ? dto.body()
+                : render(template == null ? null : template.getCuerpoTemplate(), dto.payload());
+
+        if (body == null || body.isBlank()) {
+            throw new BusinessException(
+                    "NOTIFICATION_BODY_REQUIRED",
+                    "El cuerpo de la notificación es obligatorio",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        NotificationRequest request = NotificationRequest.crear(
+                dto.correlationId(),
+                dto.eventType(),
+                dto.originService(),
+                prioridad,
+                canal,
+                recipient,
+                dto.recipientName(),
+                template == null ? dto.templateCode() : template.getCodigo(),
+                subject,
+                body,
+                JsonUtil.toJson(dto.payload())
+        );
+        request.setUuidEventoOrigen(dto.sourceEventUuid());
+        request.setUuidActorDestinatario(dto.actorUuid());
+        request.setUuidDocumentoEvidencia(dto.evidenceDocumentUuid());
+
+        NotificationRequest saved = requestRepository.saveAndFlush(request);
+        procesarEnvio(saved);
+        registrarAuditoria(
+                saved.getUuidCorrelacion(),
+                "REQUEST_INTERNAL_NOTIFICATION",
+                "NOTIFICATION_REQUEST",
+                saved.getUuidNotificacion(),
+                ResultadoAuditoriaNotificationEnum.OK,
+                null
+        );
         return toNotificationResponse(saved);
     }
 
@@ -135,6 +223,38 @@ public class NotificationService {
             ));
             registrarAuditoria(request.getUuidCorrelacion(), "SEND_NOTIFICATION", "NOTIFICATION_REQUEST", request.getUuidNotificacion(), ResultadoAuditoriaNotificationEnum.ERROR, result.responseMessage());
         }
+    }
+
+    private String resolverDestino(String actorUuid,
+                                   String eventType,
+                                   TipoCanalEnum canal,
+                                   String explicitRecipient) {
+        if (explicitRecipient != null && !explicitRecipient.isBlank()) {
+            return explicitRecipient.trim();
+        }
+        if (actorUuid == null || actorUuid.isBlank()) {
+            throw new BusinessException(
+                    "NOTIFICATION_RECIPIENT_REQUIRED",
+                    "No existe destinatario ni actor para resolver la notificación",
+                    HttpStatus.UNPROCESSABLE_ENTITY
+            );
+        }
+
+        NotificationPreference preference = preferenceRepository
+                .findByUuidActorAndTipoEventoAndTipoCanal(actorUuid.trim(), eventType, canal)
+                .or(() -> preferenceRepository.findByUuidActorAndTipoEventoAndTipoCanal(
+                        actorUuid.trim(),
+                        "*",
+                        canal
+                ))
+                .filter(item -> Boolean.TRUE.equals(item.getHabilitado()))
+                .filter(item -> item.getDestino() != null && !item.getDestino().isBlank())
+                .orElseThrow(() -> new BusinessException(
+                        "NOTIFICATION_PREFERENCE_NOT_FOUND",
+                        "No existe un destino de notificación habilitado para el actor",
+                        HttpStatus.UNPROCESSABLE_ENTITY
+                ));
+        return preference.getDestino().trim();
     }
 
     private NotificationTemplate resolverTemplate(String templateCode, String eventType, TipoCanalEnum canal) {

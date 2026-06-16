@@ -4,6 +4,7 @@ import com.banquito.platform.notification.api.dto.api.ErrorResponse;
 import com.banquito.platform.notification.shared.tracing.CorrelationIdHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -32,6 +33,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ErrorResponse> handleNoResource(NoResourceFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(LocalDateTime.now(), CorrelationIdHolder.get(), "RESOURCE_NOT_FOUND", "El recurso solicitado no existe", List.of(ex.getResourcePath())));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse(
+                LocalDateTime.now(),
+                CorrelationIdHolder.get(),
+                "SECURITY_ACCESS_DENIED",
+                "Acceso denegado. El token no posee permisos para este recurso.",
+                List.of()
+        ));
     }
 
     @ExceptionHandler(Exception.class)

@@ -49,18 +49,18 @@ springdoc:
     path: /swagger-ui.html
 
 banquito:
+  internal:
+    service-key: ${INTERNAL_SERVICE_KEY:BanQuitoInternalServiceKey2026ChangeMe}
   security:
     jwt:
       issuer: ${JWT_ISSUER:banquito-identity-access}
       secret: ${JWT_SECRET:BanQuitoIdentityJwtSecretKeyForDevelopmentOnlyChangeMe2026}
+  grpc:
+    server:
+      port: ${NOTIFICATION_GRPC_PORT:9097}
   notification:
     delivery:
       mode: ${NOTIFICATION_DELIVERY_MODE:SIMULATED}
       provider: ${NOTIFICATION_PROVIDER:SMTP}
       from: ${SMTP_FROM:no-reply@banquito.com}
       reply-to: ${SMTP_REPLY_TO:}
-  rabbitmq:
-    host: ${RABBITMQ_HOST:rabbitmq}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:banquito_rabbit}
-    password: ${RABBITMQ_PASSWORD:BanQuitoRabbit2026!}

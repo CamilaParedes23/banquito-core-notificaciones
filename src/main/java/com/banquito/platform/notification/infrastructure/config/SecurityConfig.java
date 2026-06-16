@@ -1,5 +1,6 @@
 package com.banquito.platform.notification.infrastructure.config;
 
+import com.banquito.platform.notification.infrastructure.security.InternalServiceKeyFilter;
 import com.banquito.platform.notification.infrastructure.security.JwtAuthenticationFilter;
 import com.banquito.platform.notification.infrastructure.security.RestAccessDeniedHandler;
 import com.banquito.platform.notification.infrastructure.security.RestAuthenticationEntryPoint;
@@ -15,17 +16,42 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
+
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final InternalServiceKeyFilter internalServiceKeyFilter;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, RestAuthenticationEntryPoint authenticationEntryPoint, RestAccessDeniedHandler accessDeniedHandler) { this.jwtAuthenticationFilter = jwtAuthenticationFilter; this.authenticationEntryPoint = authenticationEntryPoint; this.accessDeniedHandler = accessDeniedHandler; }
+
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          InternalServiceKeyFilter internalServiceKeyFilter,
+                          RestAuthenticationEntryPoint authenticationEntryPoint,
+                          RestAccessDeniedHandler accessDeniedHandler) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.internalServiceKeyFilter = internalServiceKeyFilter;
+        this.authenticationEntryPoint = authenticationEntryPoint;
+        this.accessDeniedHandler = accessDeniedHandler;
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
-            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .exceptionHandling(e -> e.authenticationEntryPoint(authenticationEntryPoint).accessDeniedHandler(accessDeniedHandler))
-            .authorizeHttpRequests(auth -> auth.requestMatchers("/actuator/health", "/swagger-ui.html", "/swagger-ui/**", "/api-docs", "/api-docs/**").permitAll().anyRequest().authenticated())
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exception ->
+                        exception.authenticationEntryPoint(authenticationEntryPoint)
+                                .accessDeniedHandler(accessDeniedHandler))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/api-docs",
+                                "/api-docs/**",
+                                "/internal/**"
+                        ).permitAll()
+                        .anyRequest().authenticated())
+                .addFilterBefore(internalServiceKeyFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }

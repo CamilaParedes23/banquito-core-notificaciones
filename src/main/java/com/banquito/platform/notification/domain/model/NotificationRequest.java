@@ -22,6 +22,10 @@ public class NotificationRequest {
     private String uuidNotificacion;
     @Column(name = "UUID_CORRELACION", length = 36)
     private String uuidCorrelacion;
+    @Column(name = "UUID_EVENTO_ORIGEN", length = 36)
+    private String uuidEventoOrigen;
+    @Column(name = "UUID_ACTOR_DESTINATARIO", length = 36)
+    private String uuidActorDestinatario;
     @Column(name = "TIPO_EVENTO", length = 80, nullable = false)
     private String tipoEvento;
     @Column(name = "ORIGEN_SERVICIO", length = 80, nullable = false)
